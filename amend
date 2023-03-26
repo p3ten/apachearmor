@@ -1,7 +1,7 @@
 import fileinput
 
 # Specify the filename of the security.conf file
-filename = '/etc/apache2/conf-available/security.conf'
+filename = '/etc/apache2/apache2.conf'
 
 # Create a list of the correct lines that should be in the file
 correct_lines = [
