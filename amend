@@ -1,46 +1,53 @@
 import fileinput
 
-# Specify the file path to security.conf
-filepath = '/etc/apache2/conf-available/security.conf'
+# Specify the filename of the security.conf file
+filename = '/etc/apache2/conf-available/security.conf'
 
-# Iterate over each line in the file and modify parameters as necessary
-for line in fileinput.input(filepath, inplace=True):
-    if 'ServerTokens' in line:
-        print('ServerTokens Prod')
-    elif 'ServerSignature' in line:
-        print('ServerSignature Off')
-    elif '<Directory /etc/apache2/html>' in line:
-        print(line.rstrip())
-        print('    Options None')
-        print('    AllowOverride None')
-    elif 'FileETag' in line:
-        print('FileETag None')
-    elif 'User' in line:
-        print('User apache')
-    elif '<LimitExcept GET POST HEAD>' in line:
-        print(line.rstrip())
-        print('    deny from all')
-        print('</LimitExcept>')
-    elif 'TraceEnable' in line:
-        print('TraceEnable off')
-    elif 'Header edit Set-Cookie' in line:
-        print('Header edit Set-Cookie ^(.*)$ $1;HttpOnly;Secure')
-    elif 'Header always append X-Frame-Options' in line:
-        print('Header always append X-Frame-Options SAMEORIGIN')
-    elif '<Directory /etc/apache2/html>' in line:
-        print(line.rstrip())
-        print('    Options -Indexes -Includes')
-        print('    Order allow,deny')
-        print('    Allow from all')
-    elif 'Header set X-XSS-Protection' in line:
-        print('Header set X-XSS-Protection "1; mode=block"')
-    elif 'RewriteEngine On' in line:
-        print(line.rstrip())
-        print('RewriteCond %{THE_REQUEST} !HTTP/1.1$')
-        print('RewriteRule .* - [F]')
-    elif 'Timeout' in line:
-        print('Timeout 60')
-    elif 'LoadModule' in line:
-        print('#' + line.rstrip())
+# Create a list of the correct lines that should be in the file
+correct_lines = [
+    'ServerTokens Prod\n',
+    'ServerSignature Off\n',
+    '<Directory /etc/apache2/html>\n',
+    'Options None\n',
+    'AllowOverride None\n',
+    'Options –Indexes -Includes\n',
+    'Order allow,deny\nAllow from all\n',
+    '</Directory>\n',
+    'FileETag None\n',
+    'User apache \n',
+    '<LimitExcept GET POST HEAD>\n',
+    'deny from all\n',
+    '</LimitExcept>\n',
+    'TraceEnable off\n',
+    'Header edit Set-Cookie ^(.*)$ $1;HttpOnly;Secure\n',
+    'Header always append X-Frame-Options SAMEORIGIN\n',
+    'Header set X-XSS-Protection "1; mode=block"\n',
+    'RewriteEngine On\n',
+    'RewriteCond %{THE_REQUEST} !HTTP/1.1$\n',
+    'RewriteRule .* - [F]\n',
+    'Timeout 60\n',
+    '#LoadModule dav_module modules/mod_dav.so\n',
+    '#LoadModule dav_fs_module modules/mod_dav_fs.so\n',
+    '#Include conf/extra/httpd-dav.conf\n',
+    '#LoadModule info_module modules/mod_info.so\n'
+]
+
+# Use fileinput to iterate over the lines in the file
+for line in fileinput.input(files=(filename), inplace=True):
+    # Strip whitespace and newlines from the line
+    line = line.strip()
+    
+    # Check if the line is in the list of correct lines
+    if line in correct_lines:
+        # If the line is correct, write it as-is
+        print(line)
     else:
-        print(line.rstrip())
+        # If the line is not correct or present, write the correct line instead
+        if line.startswith('#'):
+            print(line)
+        else:
+            print('# ' + line)
+        # Check that there are still correct lines left to write
+        if len(correct_lines) > 0:
+            print(correct_lines[0])
+            del correct_lines[0]
