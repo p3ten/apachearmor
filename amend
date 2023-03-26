@@ -1,0 +1,46 @@
+import fileinput
+
+# Specify the file path to security.conf
+filepath = '/etc/apache2/conf-available/security.conf'
+
+# Iterate over each line in the file and modify parameters as necessary
+for line in fileinput.input(filepath, inplace=True):
+    if 'ServerTokens' in line:
+        print('ServerTokens Prod')
+    elif 'ServerSignature' in line:
+        print('ServerSignature Off')
+    elif '<Directory /etc/apache2/html>' in line:
+        print(line.rstrip())
+        print('    Options None')
+        print('    AllowOverride None')
+    elif 'FileETag' in line:
+        print('FileETag None')
+    elif 'User' in line:
+        print('User apache')
+    elif '<LimitExcept GET POST HEAD>' in line:
+        print(line.rstrip())
+        print('    deny from all')
+        print('</LimitExcept>')
+    elif 'TraceEnable' in line:
+        print('TraceEnable off')
+    elif 'Header edit Set-Cookie' in line:
+        print('Header edit Set-Cookie ^(.*)$ $1;HttpOnly;Secure')
+    elif 'Header always append X-Frame-Options' in line:
+        print('Header always append X-Frame-Options SAMEORIGIN')
+    elif '<Directory /etc/apache2/html>' in line:
+        print(line.rstrip())
+        print('    Options -Indexes -Includes')
+        print('    Order allow,deny')
+        print('    Allow from all')
+    elif 'Header set X-XSS-Protection' in line:
+        print('Header set X-XSS-Protection "1; mode=block"')
+    elif 'RewriteEngine On' in line:
+        print(line.rstrip())
+        print('RewriteCond %{THE_REQUEST} !HTTP/1.1$')
+        print('RewriteRule .* - [F]')
+    elif 'Timeout' in line:
+        print('Timeout 60')
+    elif 'LoadModule' in line:
+        print('#' + line.rstrip())
+    else:
+        print(line.rstrip())
