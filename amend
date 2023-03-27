@@ -1,53 +1,135 @@
+#!/usr/bin/env python3
+import os
 import fileinput
 
-# Specify the filename of the security.conf file
-filename = '/etc/apache2/apache2.conf'
+apache_conf_path = "/etc/apache2/apache2.conf"
 
-# Create a list of the correct lines that should be in the file
-correct_lines = [
-    'ServerTokens Prod\n',
-    'ServerSignature Off\n',
-    '<Directory /etc/apache2/html>\n',
-    'Options None\n',
-    'AllowOverride None\n',
-    'Options –Indexes -Includes\n',
-    'Order allow,deny\nAllow from all\n',
-    '</Directory>\n',
-    'FileETag None\n',
-    'User apache \n',
-    '<LimitExcept GET POST HEAD>\n',
-    'deny from all\n',
-    '</LimitExcept>\n',
-    'TraceEnable Off\n',
-    'Header edit Set-Cookie ^(.*)$ $1;HttpOnly;Secure\n',
-    'Header always append X-Frame-Options SAMEORIGIN\n',
-    'Header set X-XSS-Protection "1; mode=block"\n',
-    'RewriteEngine On\n',
-    'RewriteCond %{THE_REQUEST} !HTTP/1.1$\n',
-    'RewriteRule .* - [F]\n',
-    'Timeout 60\n',
-    '#LoadModule dav_module modules/mod_dav.so\n',
-    '#LoadModule dav_fs_module modules/mod_dav_fs.so\n',
-    '#Include conf/extra/httpd-dav.conf\n',
-    '#LoadModule info_module modules/mod_info.so\n'
+server_tokens = "ServerTokens Prod\n"
+server_signature = "ServerSignature Off\n"
+directory_block = "<Directory /var/www/html>\nOptions None\n</Directory>\n"
+fileetag_directive = "FileETag None\n"
+
+with open(apache_conf_path, "r+") as apache_conf:
+    contents = apache_conf.readlines()
+    
+    if "ServerTokens" in "".join(contents) and "ServerSignature" in "".join(contents):
+        for i in range(len(contents)):
+            if "ServerTokens" in contents[i]:
+                contents[i] = server_tokens
+            elif "ServerSignature" in contents[i]:
+                contents[i] = server_signature
+    else:
+        contents.append("\n" + server_tokens)
+        contents.append(server_signature)
+    
+    if directory_block in "".join(contents):
+        pass
+    else:
+        contents.append("\n" + directory_block)
+
+    if fileetag_directive in "".join(contents):
+        pass
+    else:
+        contents.append("\n" + fileetag_directive)
+    
+    apache_conf.seek(0)
+    apache_conf.writelines(contents)
+    apache_conf.truncate()
+
+options = "Options -Indexes\nAllowOverride None"
+found_block = False
+found_options = False
+
+with open("/etc/apache2/apache2.conf", "r") as f:
+    file_contents = f.read()
+    if "<Directory />" in file_contents and "</Directory>" in file_contents:
+        found_block = True
+        block_contents = file_contents[file_contents.index("<Directory />") : file_contents.index("</Directory>")]
+        if options in block_contents:
+            found_options = True
+
+if found_block and not found_options:
+    with fileinput.input("/etc/apache2/apache2.conf", inplace=True) as conf:
+        for line in conf:
+            if line.strip() == "<Directory />":
+                found_block = True
+                print(line, end="")
+            elif found_block and line.strip() == "</Directory>":
+                print(options)
+                print(line, end="")
+                found_block = False
+            else:
+                print(line, end="")
+    
+    if not found_block:
+        print("<Directory />")
+        print(options)
+        print("</Directory>")
+else:
+    print("Options already present, no action needed.")
+
+##
+CONFIG_ENTRIES = [
+    '<Directory /var/www/html>',
+    '    <LimitExcept GET POST HEAD>',
+    '        deny from all',
+    '    </LimitExcept>',
+    '</Directory>'
 ]
 
-# Use fileinput to iterate over the lines in the file
-for line in fileinput.input(files=(filename), inplace=True):
-    # Strip whitespace and newlines from the line
-    line = line.strip()
-    
-    # Check if the line is in the list of correct lines
-    if line in correct_lines:
-        # If the line is correct, write it as-is
-        print(line)
-    else:
-        # If the line is not correct or present, write the correct line instead
-        if line.startswith('#'):
-            print(line)
-        else:
-            print('# ' + line)
-        # Check that there are still correct lines left to write
-        if len(correct_lines) > 0:
-            print(correct_lines[0])
-            del correct_lines[0]
+APACHE_CONF_PATH = '/etc/apache2/apache2.conf'
+
+with open(APACHE_CONF_PATH, 'r') as f:
+    apache_conf = f.read()
+
+if all(entry in apache_conf for entry in CONFIG_ENTRIES):
+    print('Configuration entries already present.')
+else:
+    apache_conf += '\n\n' + '\n'.join(CONFIG_ENTRIES) + '\n'
+
+    with open(APACHE_CONF_PATH, 'w') as f:
+        f.write(apache_conf)
+
+CONFIG_ENTRY = 'TraceEnable off'
+
+APACHE_CONF_PATH = '/etc/apache2/apache2.conf'
+
+with open(APACHE_CONF_PATH, 'r') as f:
+    apache_conf = f.read()
+
+if CONFIG_ENTRY in apache_conf:
+    print('Configuration entry already present.')
+else:
+    apache_conf += '\n' + CONFIG_ENTRY + '\n'
+
+    with open(APACHE_CONF_PATH, 'w') as f:
+        f.write(apache_conf)
+
+    print('Configuration entry added.')
+
+CONFIG_ENTRY = 'Timeout'
+NEW_TIMEOUT_VALUE = '60'
+APACHE_CONF_PATH = '/etc/apache2/apache2.conf'
+
+found_timeout = False
+with open(APACHE_CONF_PATH, 'r') as f:
+    contents = f.readlines()
+
+with open(APACHE_CONF_PATH, 'w') as f:
+    for line in contents:
+        if CONFIG_ENTRY in line:
+            if line.split()[1] == NEW_TIMEOUT_VALUE:
+                found_timeout = True
+            else:
+                line = CONFIG_ENTRY + ' ' + NEW_TIMEOUT_VALUE + '\n'
+        f.write(line)
+
+if found_timeout:
+    print('Timeout directive already set to', NEW_TIMEOUT_VALUE)
+else:
+    print('Timeout directive set to', NEW_TIMEOUT_VALUE)
+
+
+os.system("systemctl restart apache2")
+
+print("ServerTokens, ServerSignature, directory block, and FileETag directive have been set in " + apache_conf_path)
